@@ -136,15 +136,19 @@ export default function App() {
         story_settings: storySettings
       };
 
+      localStorage.setItem('originalStoryInput', JSON.stringify(requestData));
+
       console.log('Sending request with formatted data:', requestData);
 
       const response = await axios.post('http://localhost:8000/api/story/generate-seed-ideas', requestData);
 
       console.log('Received response:', response.data);
-
-      // Store the response data in localStorage
-      localStorage.setItem('storyData', JSON.stringify(response.data));
-
+      // Ensure that the requestData is being saved correctly in localStorage
+      if (response.data && Object.keys(response.data).length > 0) {
+        localStorage.setItem('storyData', JSON.stringify(response.data));
+      } else {
+        console.error('Response data is empty or not in the expected format:', response.data);
+      }
       // Navigate to results page
       router.push('/create/assist-me/seed-ideas');
 

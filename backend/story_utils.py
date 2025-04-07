@@ -70,7 +70,7 @@ class StoryGenerator:
             os.environ["OPENAI_API_KEY"] = api_key
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4"
-        self.max_output_tokens = 16000
+        self.max_output_tokens = 8000
         self.stories = {}
         
     def _generate_text(self, prompt: str, temperature: float = 0.8, max_tokens: int = 2000) -> str:

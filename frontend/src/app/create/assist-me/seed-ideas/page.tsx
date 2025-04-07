@@ -139,37 +139,103 @@ const Page = () => {
       
       // Get story input data from localStorage
       const storyInputData = localStorage.getItem('storyData');
-      const parsedStoryData = storyInputData ? JSON.parse(storyInputData) : null;
+      console.log("Story input data:", storyInputData);
+      
+      // Explicitly log all localStorage keys to debug
+      console.log("All localStorage keys:", Object.keys(localStorage));
       
       // Extract original input data that was used to generate seed ideas
       const originalStoryData = localStorage.getItem('originalStoryInput');
-      const originalData = originalStoryData ? JSON.parse(originalStoryData) : null;
+      console.log("Original story data from localStorage:", originalStoryData);
+      
+      // Check if we have valid data before parsing
+      let parsedStoryData = null;
+      if (originalStoryData && originalStoryData !== "undefined" && originalStoryData !== "null") {
+        try {
+          parsedStoryData = JSON.parse(originalStoryData);
+          console.log("Parsed story data:", parsedStoryData);
+        } catch (e) {
+          console.error("Error parsing parsedStoryData:", e);
+        }
+      } else {
+        console.warn("originalStoryData is empty, null, or undefined");
+      }
+      
+      // Make sure we handle the case where originalStoryData might be null or an invalid JSON string
+      let originalData = null;
+      try {
+        if (originalStoryData && originalStoryData !== "undefined" && originalStoryData !== "null") {
+          originalData = JSON.parse(originalStoryData);
+          console.log("Original story input data:", originalData);
+        } else {
+          console.warn("Cannot parse originalData: source data is empty, null, or undefined");
+        }
+      } catch (e) {
+        console.error("Error parsing originalStoryData:", e);
+      }
+      
+      // Log the original data to debug the structure
+      console.log("Original story input data:", originalData);
+      
+      // Get target_chapter_count from parsedStoryData, ensuring it's preserved
+      const target_chapter_count = parsedStoryData?.target_chapter_count || 
+                                 originalData?.chapters || 
+                                 3; // Default to 3 if nothing is found
+      console.log("Target chapter count:", target_chapter_count);
+      
+      // Helper function to safely trim strings - extra defensive version
+      const safeTrim = (str: any) => {
+        try {
+          if (str === undefined || str === null) return '';
+          return typeof str === 'string' ? str.trim() : String(str || '');
+        } catch (error) {
+          console.error("Error in safeTrim:", error, "Value was:", str);
+          return ''; // Return empty string on any error
+        }
+      };
       
       // Prepare story settings with proper format
       const storySettings = {
-        narrative_perspective: originalData?.narrationStyle || "Third Person",
-        setting_description: originalData?.setting || "Contemporary setting",
+        narrative_perspective: safeTrim(originalData?.narrationStyle) || "Third Person",
+        setting_description: safeTrim(originalData?.setting) || "Contemporary setting",
         time_period: "Contemporary",
         world_building_details: "Magic exists but is hidden from the public"
       };
       
-      // Prepare characters with proper format
-      const characters = Array.isArray(originalData?.characters) ? 
-        originalData.characters.slice(0, 15).map((char: any) => ({
-          name: (char.name || "").trim() || "Character",
-          description: (char.description || "").trim() || "A character in the story"
-        })) : [{
-          name: "Main Character",
-          description: "The protagonist of the story"
-        }];
+      // Prepare characters with proper format - handle missing data defensively
+      let characters = [{
+        name: "Main Character",
+        description: "The protagonist of the story"
+      }];
       
+      if (originalData && Array.isArray(originalData.characters)) {
+        try {
+          characters = originalData.characters.slice(0, 15).map((char: any) => ({
+            name: safeTrim(char?.name) || "Character",
+            description: safeTrim(char?.description) || "A character in the story"
+          }));
+        } catch (e) {
+          console.error("Error processing characters:", e);
+        }
+      }
+
+      // Determine writing style safely
+      let writingStyle = "descriptive and whimsical";
+      if (originalData) {
+        if (typeof originalData.writing_style === 'string') {
+          writingStyle = safeTrim(originalData.writing_style);
+        } else if (typeof originalData.writingStyle === 'string') {
+          writingStyle = safeTrim(originalData.writingStyle);
+        }
+      }
+
       // Prepare request data matching the expected format
       const requestData = {
         seed_summary: selectedIdea.summary,
-        genre: (originalData?.genre || "Fantasy").trim(),
-        target_chapter_count: Math.max(1, Math.min(30, parseInt(originalData?.chapters) || 3)),
+        genre: safeTrim(originalData?.genre) || "Fantasy",
+        target_chapter_count: target_chapter_count || 3,
         target_chapter_length: 3000,
-        writing_style: (originalData?.writingStyle || "descriptive and whimsical").trim(),
+        writing_style: writingStyle,
         character_count: characters.length,
         characters: characters,
         story_settings: storySettings
@@ -295,6 +361,5 @@ const Page = () => {
     </div>
   );
 };
-
 
 export default Page;
