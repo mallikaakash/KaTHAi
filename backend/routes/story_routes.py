@@ -83,7 +83,7 @@ class ChapterOutline(BaseModel):
 class DetailedOutlineRequest(BaseModel):
     seed_summary: str
     genre: str
-    target_chapter_count: int
+    target_chapter_count: int =1
     target_chapter_length: int = 3000
     writing_style: str
     character_count: Optional[int] = None

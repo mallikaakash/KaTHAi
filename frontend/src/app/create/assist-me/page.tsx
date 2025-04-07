@@ -138,7 +138,7 @@ export default function App() {
 
       console.log('Sending request with formatted data:', requestData);
 
-      const response = await axios.post('http://localhost:8001/api/story/generate-seed-ideas', requestData);
+      const response = await axios.post('http://localhost:8000/api/story/generate-seed-ideas', requestData);
 
       console.log('Received response:', response.data);
 

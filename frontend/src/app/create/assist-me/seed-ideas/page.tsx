@@ -137,19 +137,23 @@ const Page = () => {
       // Store the selected seed idea for the next page
       localStorage.setItem('selectedSeedIdea', JSON.stringify(selectedIdea));
       
-      // Get proper data from localStorage about story settings
+      // Get story input data from localStorage
+      const storyInputData = localStorage.getItem('storyData');
+      const parsedStoryData = storyInputData ? JSON.parse(storyInputData) : null;
+      
+      // Extract original input data that was used to generate seed ideas
       const originalStoryData = localStorage.getItem('originalStoryInput');
       const originalData = originalStoryData ? JSON.parse(originalStoryData) : null;
       
-      // Combine data sources with priority to the original input
+      // Prepare story settings with proper format
       const storySettings = {
-        narrative_perspective: originalData?.narrationStyle || "third person",
-        setting_description: originalData?.setting || "contemporary setting",
-        time_period: null,
-        world_building_details: null
+        narrative_perspective: originalData?.narrationStyle || "Third Person",
+        setting_description: originalData?.setting || "Contemporary setting",
+        time_period: "Contemporary",
+        world_building_details: "Magic exists but is hidden from the public"
       };
       
-      // Ensure characters are properly formatted and meet validation requirements
+      // Prepare characters with proper format
       const characters = Array.isArray(originalData?.characters) ? 
         originalData.characters.slice(0, 15).map((char: any) => ({
           name: (char.name || "").trim() || "Character",
@@ -159,22 +163,24 @@ const Page = () => {
           description: "The protagonist of the story"
         }];
       
-      // Prepare request data matching the DetailedOutlineRequest format
+      // Prepare request data matching the expected format
       const requestData = {
         seed_summary: selectedIdea.summary,
-        genre: (originalData?.genre || "Fiction").trim(),
+        genre: (originalData?.genre || "Fantasy").trim(),
         target_chapter_count: Math.max(1, Math.min(30, parseInt(originalData?.chapters) || 3)),
         target_chapter_length: 3000,
-        writing_style: (originalData?.writingStyle || "default").trim() || "contemporary",
-        character_count: Math.max(1, Math.min(15, characters.length)),
+        writing_style: (originalData?.writingStyle || "descriptive and whimsical").trim(),
+        character_count: characters.length,
         characters: characters,
         story_settings: storySettings
       };
       
-      console.log("Detailed outline request data:", requestData);
+      console.log("Request data:", requestData);
       
-      // Make the actual API call to the backend endpoint
-      const response = await axios.post<DetailedOutlineResponse>('http://localhost:8001/api/story/create-detailed-outline', requestData);
+      // Make API call to the backend endpoint
+      const response = await axios.post('http://localhost:8000/api/story/create-detailed-outline', requestData);
+      
+      console.log("API response:", response.data);
       
       // Handle the response
       if (response.data && response.data.chapter_outlines) {
