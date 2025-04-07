@@ -6,6 +6,10 @@ import os
 from datetime import datetime
 import uuid
 from dotenv import load_dotenv
+import base64
+import mimetypes
+import google.generativeai as genai
+from google.generativeai import types
 
 # Load environment variables
 load_dotenv()
@@ -70,8 +74,16 @@ class StoryGenerator:
             os.environ["OPENAI_API_KEY"] = api_key
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4"
-        self.max_output_tokens = 8000
+        self.max_output_tokens = 7000
         self.stories = {}
+        
+        # Initialize Gemini client if API key exists
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if gemini_api_key:
+            genai.configure(api_key=gemini_api_key)
+            print(f"Loaded Gemini API Key for image generation: {bool(gemini_api_key)}")
+        else:
+            print("WARNING: No Gemini API key found. Book cover generation may fail.")
         
     def _generate_text(self, prompt: str, temperature: float = 0.8, max_tokens: int = 2000) -> str:
         try:
@@ -259,7 +271,7 @@ class StoryGenerator:
         except Exception as e:
             print(f"Error parsing outline: {e}")
             raise
-        
+
     def create_story(self, title: str, genre: str, style: str = "default") -> Story:
         """Create a new story with basic metadata"""
         story = Story(
@@ -275,26 +287,23 @@ class StoryGenerator:
         
         return story
         
-    def generate_chapter(self, story_id: str, chapter_number: int, chapter_summary: str) -> Chapter:
-        """Generate full chapter using summary, previous chapter, and next chapter summary as context"""
-        story = self.stories[story_id]["data"]
-        memory = self.stories[story_id]["memory"]
+    def generate_chapter(self, chapter_number: int, chapter_summary: str, writing_style: str = "default", 
+                        previous_chapter_title: str = None, previous_chapter_ending: str = None, 
+                        next_chapter_summary: str = None, target_word_count: int = 2500) -> Chapter:
+        """Generate full chapter using summary and optional context provided by the frontend"""
         
-        # Store the chapter summary
-        memory.add_chapter_summary(chapter_number, chapter_summary)
-        
-        # Get previous chapter if it exists
+        # Build context based on provided parameters instead of in-memory storage
         previous_context = ""
-        if chapter_number > 1 and len(story.chapters) >= chapter_number - 1:
-            previous_chapter = story.chapters[chapter_number - 2]
+        if previous_chapter_title and previous_chapter_ending:
             previous_context = f"""
-            Previous chapter ({previous_chapter.title}) ended with:
-            {previous_chapter.content[-500:]}
+            Previous chapter ({previous_chapter_title}) ended with:
+            {previous_chapter_ending}
             """
+        elif chapter_number > 1:
+            previous_context = "This follows the previous chapter."
         
-        # Get next chapter's summary if it exists
+        # Use next chapter context if provided
         next_chapter_context = ""
-        next_chapter_summary = memory.get_chapter_summary(chapter_number + 1)
         if next_chapter_summary:
             next_chapter_context = f"""
             The next chapter will cover:
@@ -309,10 +318,10 @@ class StoryGenerator:
 
         {previous_context if previous_context else 'This is the first chapter.'}
 
-        {next_chapter_context if next_chapter_context else 'This is the final chapter.' if chapter_number == len(memory.chapter_summaries) else ''}
+        {next_chapter_context if next_chapter_context else 'This is the final chapter.' if not next_chapter_summary else ''}
 
-        Target length: {story.target_chapter_length} words
-        Writing style: {story.writing_style}
+        TARGET WORD COUNT: {target_word_count} words (between {target_word_count} and {target_word_count + 500} words)
+        Writing style: {writing_style}
 
         Ensure the chapter:
         1. Follows the provided summary
@@ -321,11 +330,12 @@ class StoryGenerator:
         4. Includes vivid descriptions and engaging dialogue
         5. Ends in a way that flows naturally into the next chapter's events
         6. Creates anticipation for what comes next
+        7. MEETS THE TARGET WORD COUNT OF {target_word_count}-{target_word_count + 500} words
 
         Start with the chapter title in the format:
         # Chapter Title
         
-        Then write the chapter content.
+        Then write the chapter content. Your chapter MUST be at least {target_word_count} words but not exceed {target_word_count + 500} words.
         """
         
         result = self._generate_text(
@@ -347,10 +357,6 @@ class StoryGenerator:
             word_count=len(content.split())
         )
         
-        # Add to story
-        story.chapters.append(chapter)
-        story.update_timestamp()
-        
         return chapter
         
     def get_story(self, story_id: str) -> Optional[Story]:
@@ -358,3 +364,190 @@ class StoryGenerator:
         if story_id in self.stories:
             return self.stories[story_id]["data"]
         return None
+
+    def store_chapter_outlines(self, story_id: str, chapter_outlines: List[Dict[str, Any]]):
+        """Store all chapter outlines in the story's memory for future reference"""
+        if story_id not in self.stories:
+            raise ValueError(f"Story with ID {story_id} not found")
+        
+        memory = self.stories[story_id]["memory"]
+        
+        for outline in chapter_outlines:
+            memory.add_chapter_summary(outline["number"], outline["summary"])
+        
+        return True
+
+    def generate_book_cover(self, story_title: str, story_summary: str, characters: List[CharacterDetail] = None, genre: str = None) -> dict:
+        """
+        Generate a book cover image using Gemini API based on the story details
+        
+        Returns:
+            dict: Contains base64 encoded image and mime type
+        """
+        try:
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            if not gemini_api_key:
+                raise ValueError("Gemini API key not found in environment variables")
+                
+            client = genai.Client(api_key=gemini_api_key)
+            model = "gemini-2.0-flash-exp-image-generation"
+            
+            # Create character descriptions for the prompt
+            character_descriptions = ""
+            if characters and len(characters) > 0:
+                character_descriptions = "Main characters:\n"
+                for char in characters[:3]:  # Limit to 3 main characters
+                    character_descriptions += f"- {char.name}: {char.description}\n"
+            
+            # Craft a prompt specifically for book cover generation
+            prompt = f"""
+            ONLY GENERATE AN IMAGE. NO TEXT RESPONSE.
+            
+            Create a professional, eye-catching book cover image for the following story:
+            
+            Title: The Phantom Next Door
+            Genre: {genre or "Fiction"}
+            
+            Summary: {story_summary[:500]}
+            
+            {character_descriptions}
+            
+            IMPORTANT INSTRUCTIONS:
+            - Create ONLY an image suitable for a professional book cover
+            - DO NOT include any text or title on the cover
+            - The image should capture the essence and mood of the story
+            - Use a style appropriate for the genre
+            - Make it visually striking with good composition
+            - Ensure the image is high quality and suitable for a book cover
+            - No text elements, watermarks, or signatures
+            - Image should have portrait orientation (taller than wide)
+            """
+            
+            contents = [
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=prompt)],
+                ),
+            ]
+            
+            generate_content_config = types.GenerateContentConfig(
+                esponse_modalities=[
+            "image",
+            "text",
+        ],
+                response_mime_type="text/plain",
+            )
+            
+            # Stream response and collect image data
+            image_data = None
+            mime_type = None
+            
+            for chunk in client.models.generate_content_stream(
+                model=model,
+                contents=contents,
+                config=generate_content_config,
+            ):
+                if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                    continue
+                    
+                if chunk.candidates[0].content.parts[0].inline_data:
+                    inline_data = chunk.candidates[0].content.parts[0].inline_data
+                    image_data = inline_data.data
+                    mime_type = inline_data.mime_type
+                    break
+            
+            if not image_data:
+                raise ValueError("No image was generated in the response")
+                
+            # Return base64 encoded image and mime type
+            return {
+                "image_data": base64.b64encode(image_data).decode('utf-8'),
+                "mime_type": mime_type
+            }
+            
+        except Exception as e:
+            print(f"Error generating book cover: {e}")
+            raise
+
+    def generate_surprise_story(self, category: str, story_type: str, length: str, tone: str, target_audience: str, prompt: str) -> dict:
+        """
+        Generate a complete surprise story based on user preferences.
+        
+        Args:
+            category: The story category (e.g., "Children's Stories", "Adult Stories")
+            story_type: The specific type of story (e.g., "Fairy Tale", "Self-Help")
+            length: The desired length of the story (e.g., "Short Story", "Medium Story")
+            tone: The tone of the story (e.g., "Whimsical", "Serious")
+            target_audience: The target audience (e.g., "Young Children", "Adults")
+            prompt: A custom prompt for the story generation
+            
+        Returns:
+            A dictionary containing the generated story
+        """
+        try:
+            # Determine word count based on length
+            word_count = 1000
+            if length.lower() == "medium story":
+                word_count = 2000
+            elif length.lower() == "long story":
+                word_count = 3000
+            
+            # Create a system prompt based on the user's preferences
+            system_prompt = f"""
+            You are a creative storyteller tasked with writing a {length.lower()} {story_type.lower()} story.
+            
+            Story Category: {category}
+            Story Type: {story_type}
+            Tone: {tone}
+            Target Audience: {target_audience}
+            
+            Please write a complete, engaging story that matches these specifications.
+            The story should be approximately {word_count} words in length.
+            Make it appropriate for the target audience and maintain the specified tone throughout.
+            
+            Include a title for the story at the beginning.
+            """
+            
+            # Generate the story using the OpenAI API
+            story_text = self._generate_text(
+                prompt=system_prompt + "\n\n" + prompt,
+                temperature=0.8,
+                max_tokens=4000
+            )
+            
+            # Extract the title from the story (assuming it's the first line)
+            lines = story_text.strip().split('\n')
+            title = lines[0].strip()
+            if title.startswith('Title:'):
+                title = title[6:].strip()
+            
+            # Create a response object
+            response = {
+                "title": title,
+                "content": story_text,
+                "category": category,
+                "story_type": story_type,
+                "length": length,
+                "tone": tone,
+                "target_audience": target_audience,
+                "word_count": len(story_text.split()),
+                "created_at": datetime.now().isoformat()
+            }
+            
+            return response
+            
+        except Exception as e:
+            print(f"Error generating surprise story: {str(e)}")
+            raise e
+
+    class DetailedOutlineRequest(BaseModel):
+        seed_summary: str
+        genre: str
+        title: str
+        target_chapter_count: int = 1
+        target_chapter_length: int = 3000
+        writing_style: str
+        character_count: Optional[int] = None
+        characters: Optional[List[CharacterDetail]] = None
+        story_settings: StorySettings
+        story_id: Optional[str] = None

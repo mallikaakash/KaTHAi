@@ -21,6 +21,11 @@ const capriola = Capriola({
 interface Character {
   name: string;
   description: string;
+  background?: string;
+  goals?: string;
+  personality_traits?: string[];
+  relationships?: { [key: string]: string };
+  arc_description?: string;
 }
 
 interface SeedIdea {
@@ -212,7 +217,12 @@ const Page = () => {
         try {
           characters = originalData.characters.slice(0, 15).map((char: any) => ({
             name: safeTrim(char?.name) || "Character",
-            description: safeTrim(char?.description) || "A character in the story"
+            description: safeTrim(char?.description) || "A character in the story",
+            background: safeTrim(char?.background),
+            goals: safeTrim(char?.goals),
+            personality_traits: char?.personality_traits || [],
+            relationships: char?.relationships || {},
+            arc_description: safeTrim(char?.arc_description)
           }));
         } catch (e) {
           console.error("Error processing characters:", e);
@@ -233,6 +243,7 @@ const Page = () => {
       const requestData = {
         seed_summary: selectedIdea.summary,
         genre: safeTrim(originalData?.genre) || "Fantasy",
+        title: safeTrim(originalData?.title) || "Untitled Story",
         target_chapter_count: target_chapter_count || 3,
         target_chapter_length: 3000,
         writing_style: writingStyle,

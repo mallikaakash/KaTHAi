@@ -190,11 +190,13 @@ export default function App() {
       <div className='flex flex-col items-center justify-center'>
      
         <div className="fixed left-4 top-4">
+        <Link href="/">
           <button className='bg-gradient-to-r from-amber-700 to-amber-600 text-white px-5 py-2 rounded-lg shadow-md hover:shadow-amber-300/50 transition-all font-sans var(--font-quantico)'>
-            <Link href="/create">
+           
               Back
-            </Link>
+            
           </button>
+          </Link>
         </div>
       </div>
         <div className="max-w-4xl mx-auto bg-slate-50 shadow-2xl rounded-2xl p-6 backdrop-blur-sm">
