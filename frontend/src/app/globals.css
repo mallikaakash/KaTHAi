@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --amber-glow: #f59e0b;
+  --amber-dark: #b45309;
+  --amber-light: #fbbf24;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-playfair-display);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Custom Button Animation */
+.animated-border-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.animated-border-button::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 0.5rem;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    var(--amber-glow),
+    var(--amber-dark),
+    var(--amber-glow),
+    var(--amber-dark),
+    var(--amber-glow)
+  );
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: rotate-border 4s linear infinite;
+  opacity: 0.8;
+}
+
+.animated-border-button:hover::before {
+  animation: rotate-border 2s linear infinite;
+  opacity: 1;
+}
+
+@keyframes rotate-border {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Custom transitions */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Floating stars animation */
+.star {
+  position: absolute;
+  border-radius: 50%;
+  box-shadow: 0 0 4px 2px rgba(240, 194, 131, 0.5);
+  transition: all 0.3s ease;
+}
+
+.stars-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Enhanced particles with glow effect */
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 4px 2px rgba(240, 194, 131, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 8px 4px rgba(240, 194, 131, 0.7);
+  }
+}
+
+.star {
+  animation: glow 3s infinite alternate;
+}
+
+/* Gradient text */
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(45deg, var(--amber-glow), var(--amber-light));
+  text-shadow: 0 2px 15px rgba(251, 191, 36, 0.2);
+}
+
+/* Section transitions */
+section {
+  position: relative;
+  z-index: 1;
+}
+
+section::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--amber-glow), transparent);
+  opacity: 0.3;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--amber-dark);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--amber-glow);
+}
+
+/* Card animations */
+.card-hover {
+  transition: all 0.3s ease;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.card-hover:hover {
+  transform: rotateY(5deg) rotateX(5deg);
+}
+
+/* Enhanced CTA button */
+.cta-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.7s ease;
+}
+
+.cta-button:hover::before {
+  left: 100%;
+}
