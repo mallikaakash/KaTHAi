@@ -67,9 +67,9 @@ const storyCategories = {
 // Story settings
 const storySettings = {
   length: [
-    { id: "short", name: "Short Story", description: "A quick read (5-10 minutes)" },
-    { id: "medium", name: "Medium Story", description: "A moderate read (10-20 minutes)" },
-    { id: "long", name: "Long Story", description: "A longer read (20-30 minutes)" }
+    { id: "short", name: "Short Story", description: "A quick read (2-3 minutes)" },
+    { id: "medium", name: "Medium Story", description: "A moderate read (5-10 minutes)" },
+    { id: "long", name: "Long Story", description: "A longer read (10-15 minutes)" }
   ],
   tone: [
     { id: "whimsical", name: "Whimsical", description: "Playful and imaginative" },

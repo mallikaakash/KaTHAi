@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Quantico, Capriola } from 'next/font/google';
@@ -29,11 +29,26 @@ interface SurpriseStory {
   created_at: string;
 }
 
+interface TextToSpeechResponse {
+  request_id: string;
+  audios: string[]; // base64 encoded audio
+}
+
 const StoryPage = () => {
   const router = useRouter();
   const [story, setStory] = useState<SurpriseStory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Audio generation states
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [generatingAudio, setGeneratingAudio] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  
+  // Language and speaker selection
+  const [selectedLanguage, setSelectedLanguage] = useState("en-IN");
+  const [selectedSpeaker, setSelectedSpeaker] = useState("meera");
 
   useEffect(() => {
     // Retrieve the story from localStorage
@@ -71,6 +86,129 @@ const StoryPage = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+  
+  // Function to handle language change
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLanguage(e.target.value);
+    setAudioUrl(null); // Clear previous audio
+  };
+  
+  // Function to handle speaker change
+  const handleSpeakerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSpeaker(e.target.value);
+    setAudioUrl(null); // Clear previous audio
+  };
+
+  // Function to generate speech from text using Sarvam AI
+  const generateSpeech = async () => {
+    if (!story?.content) return;
+    
+    setGeneratingAudio(true);
+    setError(null);
+    
+    try {
+      // Get the story content
+      const storyContent = story.content;
+      
+      // Sarvam AI has a limit of 500 characters per input
+      // Split the content into chunks of 500 characters
+      const textChunks = [];
+      for (let i = 0; i < storyContent.length; i += 490) {
+        textChunks.push(storyContent.slice(i, i + 490));
+      }
+      
+      // Process only the first chunk for now (API allows up to 3 chunks)
+      const textToProcess = textChunks.slice(0, 3);
+      
+      // Hardcoded API key for testing
+      const apiKey = "4c271227-c828-428a-8253-0e5ce0b13ed5";
+      
+      // Call Sarvam AI Text-to-Speech API with correct header
+      const response = await fetch('https://api.sarvam.ai/text-to-speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-subscription-key': apiKey
+        },
+        body: JSON.stringify({
+          inputs: textToProcess,
+          target_language_code: selectedLanguage,
+          speaker: selectedSpeaker,
+          pitch: 0,
+          pace: 0.8,
+          loudness: 1.55,
+          speech_sample_rate: 22050,
+          enable_preprocessing: false,
+          model: "bulbul:v1"
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error Response:', errorData);
+        throw new Error(`API request failed with status ${response.status}: ${errorData.message || 'Unknown error'}`);
+      }
+      
+      const data: TextToSpeechResponse = await response.json();
+      
+      if (data.audios && data.audios.length > 0) {
+        // Convert base64 audio to a playable URL
+        const audioBase64 = data.audios[0];
+        const blob = base64ToBlob(audioBase64, 'audio/wav');
+        const audioUrl = URL.createObjectURL(blob);
+        
+        setAudioUrl(audioUrl);
+        
+        // Remove localStorage storage to avoid quota exceeded error
+        // We'll just keep the audio URL in memory
+      } else {
+        throw new Error('No audio data received from the API');
+      }
+    } catch (error) {
+      console.error('Error generating speech:', error);
+      setError(`Failed to generate audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setGeneratingAudio(false);
+    }
+  };
+  
+  // Utility function to convert base64 to Blob
+  const base64ToBlob = (base64: string, mimeType: string) => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    
+    for (let i = 0; i < byteCharacters.length; i += 512) {
+      const slice = byteCharacters.slice(i, i + 512);
+      
+      const byteNumbers = new Array(slice.length);
+      for (let j = 0; j < slice.length; j++) {
+        byteNumbers[j] = slice.charCodeAt(j);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    
+    return new Blob(byteArrays, { type: mimeType });
+  };
+
+  // Function to toggle audio playback
+  const togglePlayback = () => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    
+    setIsPlaying(!isPlaying);
+  };
+
+  // Handle audio ended event
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
   };
 
   if (isLoading) {
@@ -156,6 +294,132 @@ const StoryPage = () => {
                   {paragraph}
                 </p>
               ))}
+            </div>
+            
+            {/* Audio Generation Section */}
+            <div className="mt-12 border-t border-amber-200 pt-8">
+              <h2 className="text-2xl font-bold text-center text-amber-800 mb-6 font-sans var(--font-quantico)">Listen to Your Story</h2>
+              
+              <div className="bg-amber-50/50 p-4 rounded-lg border-2 border-amber-100 mb-6">
+                <h3 className="text-lg font-semibold text-amber-800 font-sans var(--font-quantico) mb-4">
+                  Audiobook Settings
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-amber-800 mb-2 font-sans var(--font-capriola)">
+                      Language
+                    </label>
+                    <select
+                      value={selectedLanguage}
+                      onChange={handleLanguageChange}
+                      className="w-full p-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-gray-800"
+                    >
+                      <option value="bn-IN">Bengali</option>
+                      <option value="en-IN">English (India)</option>
+                      <option value="gu-IN">Gujarati</option>
+                      <option value="hi-IN">Hindi</option>
+                      <option value="kn-IN">Kannada</option>
+                      <option value="ml-IN">Malayalam</option>
+                      <option value="mr-IN">Marathi</option>
+                      <option value="od-IN">Odia</option>
+                      <option value="pa-IN">Punjabi</option>
+                      <option value="ta-IN">Tamil</option>
+                      <option value="te-IN">Telugu</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-amber-800 mb-2 font-sans var(--font-capriola)">
+                      Voice
+                    </label>
+                    <select
+                      value={selectedSpeaker}
+                      onChange={handleSpeakerChange}
+                      className="w-full p-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none text-gray-800"
+                    >
+                      <option value="meera">meera</option>
+                      <option value="arvind">arvind</option>
+                      <option value="vidya">vidya</option>
+                      <option value="arjun">arjun</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={generateSpeech}
+                  disabled={generatingAudio || !story}
+                  className={`bg-gradient-to-r from-amber-700 to-amber-600 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-amber-300/50 transition-all font-sans var(--font-quantico) w-full ${
+                    generatingAudio ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {generatingAudio ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Generating Audio...
+                    </span>
+                  ) : 'Generate Audiobook'}
+                </button>
+              </div>
+              
+              {/* Audio Player */}
+              {audioUrl && (
+                <div className="mt-4 bg-amber-50 p-4 rounded-lg border border-amber-200">
+                  <h3 className="text-lg font-semibold text-amber-800 font-sans var(--font-quantico) mb-2">
+                    Audiobook Player
+                  </h3>
+                  
+                  <div className="flex items-center justify-center space-x-4">
+                    <button 
+                      onClick={togglePlayback}
+                      className="bg-amber-600 hover:bg-amber-700 text-white rounded-full p-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      {isPlaying ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </button>
+                    
+                    <audio 
+                      ref={audioRef}
+                      src={audioUrl}
+                      onEnded={handleAudioEnded}
+                      controls
+                      className="w-full"
+                    />
+                    
+                    <div className="text-amber-800">
+                      Now playing - <br/>{story?.title}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <a 
+                      href={audioUrl} 
+                      download={`${story?.title || 'story'}.mp3`}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg font-sans var(--font-quantico) flex items-center justify-center w-full md:w-auto"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download Audio
+                    </a>
+                  </div>
+                  
+                  <p className="text-sm text-amber-600 mt-4 text-center">
+                    Audio generated with Sarvam AI Text-to-Speech
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="mt-12 flex justify-center">
