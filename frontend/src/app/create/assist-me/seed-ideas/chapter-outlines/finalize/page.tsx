@@ -180,7 +180,8 @@ Style: Photorealistic, cinematic, professional book cover with title text and au
       const textToProcess = textChunks.slice(0, 3);
       
       // Hardcoded API key for testing
-      const apiKey = "4c271227-c828-428a-8253-0e5ce0b13ed5";
+      //IDHAR
+      const apiKey = process.env.NEXT_PUBLIC_SARVAM_API_KEY;
       
       // Call Sarvam AI Text-to-Speech API with correct header
       const response = await fetch('https://api.sarvam.ai/text-to-speech', {
@@ -298,7 +299,8 @@ Style: Photorealistic, cinematic, professional book cover with title text and au
     
     try {
       // Get API key from environment variable or use the hardcoded one
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "AIzaSyCAARESEd370wFfmB-v1EsO4EjxKLaPkiM";
+      //IDHAR
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY ;
       
       const ai = new GoogleGenAI({ apiKey });
       const model = ai.models.generateContent({
