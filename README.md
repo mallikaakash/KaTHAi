@@ -1,6 +1,6 @@
-# Katha AI: AI-Powered Story Creation Platform
+# KathaAI: AI-Powered Story Creation Platform
 
-**Katha AI** is an advanced AI writing partner that helps authors create stories from concept to completion. Whether you're a writer seeking assistance or a reader looking for unique narratives, Katha AI provides seamless story generation, chapter-by-chapter development, and multi-modal export options—all without requiring any sign-up.
+**KathaAI** is an advanced AI writing partner that helps authors create stories from concept to completion. Whether you're a writer seeking assistance or a reader looking for unique narratives, KathaAI provides seamless story generation, chapter-by-chapter development, and multi-modal export options—all without requiring any sign-up.
 
 ## ✨ Features
 
@@ -47,7 +47,7 @@
 ## 📁 Project Structure
 
 ```
-Katha_AI/
+KathaAI/
 ├── backend/
 │   ├── main.py                 # FastAPI application entry point
 │   ├── story_utils.py          # Core story generation logic
